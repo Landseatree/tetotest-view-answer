@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>解答リンク認証</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f4f6fa;
+      font-family: sans-serif;
+      color: #333;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      width: 100%;
+      max-width: 420px;
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: 0 5px 25px #00000010;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 23px;
+    }
+
+    p {
+      text-align: center;
+      color: #777;
+      font-size: 14px;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      margin: 20px 0 12px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      background: #2864dc;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .6;
+    }
+
+    #message {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    #results {
+      display: none;
+      margin-top: 25px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+
+    #results a {
+      display: block;
+      padding: 14px;
+      margin: 10px 0;
+      border-radius: 8px;
+      background: #edf3ff;
+      color: #2457b7;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="card">
+    <h1>解答リンク</h1>
+    <p>パスワードを入力してください。</p>
+
+    <input
+      id="password"
+      type="password"
+      placeholder="パスワード"
+      autocomplete="current-password"
+    >
+
+    <button id="submit" onclick="verify()">
+      認証する
+    </button>
+
+    <div id="message" role="status"></div>
+
+    <section id="results">
+      <h3>解答・全容</h3>
+      <div id="linkList"></div>
+    </section>
+  </main>
+
+  <script>
+    const API_URL =
+      'https://既存サイトのドメイン/api/verify-password';
+
+    async function verify() {
+      const password =
+        document.getElementById('password').value;
+
+      const button =
+        document.getElementById('submit');
+
+      const message =
+        document.getElementById('message');
+
+      const results =
+        document.getElementById('results');
+
+      const linkList =
+        document.getElementById('linkList');
+
+      message.textContent = '';
+      results.style.display = 'none';
+      linkList.replaceChildren();
+
+      if (!password) {
+        message.textContent = 'パスワードを入力してください。';
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = '認証中...';
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success ||
+            !Array.isArray(data.links)) {
+          message.textContent =
+            'パスワードが正しくありません。';
+          return;
+        }
+
+        data.links.forEach(link => {
+          try {
+            const url = new URL(link.url);
+
+            if (!['https:', 'http:'].includes(url.protocol)) {
+              return;
+            }
+
+            const a = document.createElement('a');
+            a.href = url.href;
+            a.textContent = link.title;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+
+            linkList.appendChild(a);
+          } catch {
+            // 不正なURLは表示しない
+          }
+        });
+
+        if (linkList.children.length > 0) {
+          results.style.display = 'block';
+          message.textContent = '認証に成功しました。';
+        } else {
+          message.textContent = 'リンクを取得できませんでした。';
+        }
+
+      } catch (error) {
+        message.textContent =
+          'APIとの通信に失敗しました。';
+        console.error(error);
+
+      } finally {
+        button.disabled = false;
+        button.textContent = '認証する';
+      }
+    }
+
+    document.getElementById('password')
+      .addEventListener('keydown', event => {
+        if (event.key === 'Enter') verify();
+      });
+  </script>
+</body>
+</html>
